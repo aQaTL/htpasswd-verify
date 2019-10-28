@@ -1,3 +1,63 @@
+/*
+ * This is work is derived from material Copyright RSA Data Security, Inc.
+ *
+ * The RSA copyright statement and Licence for that original material is
+ * included below. This is followed by the Apache copyright statement and
+ * licence for the modifications made to that material.
+ */
+
+/* MD5C.C - RSA Data Security, Inc., MD5 message-digest algorithm
+ */
+
+/* Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
+   rights reserved.
+
+   License to copy and use this software is granted provided that it
+   is identified as the "RSA Data Security, Inc. MD5 Message-Digest
+   Algorithm" in all material mentioning or referencing this software
+   or this function.
+
+   License is also granted to make and use derivative works provided
+   that such works are identified as "derived from the RSA Data
+   Security, Inc. MD5 Message-Digest Algorithm" in all material
+   mentioning or referencing the derived work.
+
+   RSA Data Security, Inc. makes no representations concerning either
+   the merchantability of this software or the suitability of this
+   software for any particular purpose. It is provided "as is"
+   without express or implied warranty of any kind.
+
+   These notices must be retained in any copies of any part of this
+   documentation and/or software.
+ */
+
+/*
+ * This work is derived from Apache Software Foundation's http server project
+ *
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * The apr_md5_encode() routine uses much code obtained from the FreeBSD 3.0
+ * MD5 crypt() function, which is licenced as follows:
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 42):
+ * <phk@login.dknet.dk> wrote this file.  As long as you retain this notice you
+ * can do whatever you want with this stuff. If we meet some day, and you think
+ * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
+ * ----------------------------------------------------------------------------
+ */
+
 const S11: u32 = 7;
 const S12: u32 = 12;
 const S13: u32 = 17;
