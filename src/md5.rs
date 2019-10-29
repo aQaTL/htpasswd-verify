@@ -10,26 +10,26 @@
  */
 
 /* Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
-   rights reserved.
+  rights reserved.
 
-   License to copy and use this software is granted provided that it
-   is identified as the "RSA Data Security, Inc. MD5 Message-Digest
-   Algorithm" in all material mentioning or referencing this software
-   or this function.
+  License to copy and use this software is granted provided that it
+  is identified as the "RSA Data Security, Inc. MD5 Message-Digest
+  Algorithm" in all material mentioning or referencing this software
+  or this function.
 
-   License is also granted to make and use derivative works provided
-   that such works are identified as "derived from the RSA Data
-   Security, Inc. MD5 Message-Digest Algorithm" in all material
-   mentioning or referencing the derived work.
+  License is also granted to make and use derivative works provided
+  that such works are identified as "derived from the RSA Data
+  Security, Inc. MD5 Message-Digest Algorithm" in all material
+  mentioning or referencing the derived work.
 
-   RSA Data Security, Inc. makes no representations concerning either
-   the merchantability of this software or the suitability of this
-   software for any particular purpose. It is provided "as is"
-   without express or implied warranty of any kind.
+  RSA Data Security, Inc. makes no representations concerning either
+  the merchantability of this software or the suitability of this
+  software for any particular purpose. It is provided "as is"
+  without express or implied warranty of any kind.
 
-   These notices must be retained in any copies of any part of this
-   documentation and/or software.
- */
+  These notices must be retained in any copies of any part of this
+  documentation and/or software.
+*/
 
 /*
  * This work is derived from Apache Software Foundation's http server project
@@ -58,6 +58,10 @@
  * ----------------------------------------------------------------------------
  */
 
+const APR1_ID: &'static str = "$apr1$";
+
+const DIGEST_SIZE: usize = 16;
+
 const S11: u32 = 7;
 const S12: u32 = 12;
 const S13: u32 = 17;
@@ -74,8 +78,6 @@ const S41: u32 = 6;
 const S42: u32 = 10;
 const S43: u32 = 15;
 const S44: u32 = 21;
-
-const DIGEST_SIZE: usize = 16;
 
 static PADDING: [u8; 64] = [
 	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -191,15 +193,8 @@ impl MD5Ctx {
 
 fn md5_transform(state: &mut [u32; 4], block: &[u8]) {
 	let (mut a, mut b, mut c, mut d) = (state[0], state[1], state[2], state[3]);
-	let mut tmp_buf: [u32; DIGEST_SIZE] = [0u32; DIGEST_SIZE];
 
-	let x;
-	if block[0] as *mut u8 as usize % std::mem::size_of::<u32>() == 0 {
-		x = unsafe { std::mem::transmute::<&[u8], &[u32]>(block) };
-	} else {
-		decode(&mut tmp_buf, block, 64);
-		x = &tmp_buf;
-	}
+	let x = unsafe { std::slice::from_raw_parts(block.as_ptr() as *const u32, block.len() / 4) };
 
 	/* Round 1 */
 	ff(&mut a, b, c, d, x[0], S11, 0xd76aa478); /* 1 */
@@ -302,9 +297,39 @@ fn decode(output: &mut [u32], input: &[u8], len: usize) {
 	}
 }
 
-const APR1_ID: &'static str = "$apr1$";
+fn encode_digest(digest: &[u32; 16]) -> String {
+	let mut p = vec![0u8; 22];
+	let l = ((digest[0] << 16) | (digest[6] << 8) | digest[12]) as u64;
+	to_64(&mut p[0..4], l, 4);
 
-pub fn md5_encode(pw: &str, salt: &str) -> String {
+	let l = ((digest[1] << 16) | (digest[7] << 8) | digest[13]) as u64;
+	to_64(&mut p[4..8], l, 4);
+
+	let l = ((digest[2] << 16) | (digest[8] << 8) | digest[14]) as u64;
+	to_64(&mut p[8..12], l, 4);
+
+	let l = ((digest[3] << 16) | (digest[9] << 8) | digest[15]) as u64;
+	to_64(&mut p[12..16], l, 4);
+
+	let l = ((digest[4] << 16) | (digest[10] << 8) | digest[5]) as u64;
+	to_64(&mut p[16..20], l, 4);
+
+	let l = digest[11] as u64;
+	to_64(&mut p[20..22], l, 2);
+
+	String::from_utf8(p).unwrap()
+}
+
+fn to_64(s: &mut [u8], mut v: u64, n: i32) {
+	let itoa64 = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".as_bytes();
+
+	for i in 0..n as usize {
+		s[i] = itoa64[(v & 0x3f) as usize];
+		v >>= 6;
+	}
+}
+
+pub fn md5_apr1_encode(pw: &str, salt: &str) -> String {
 	let mut sp = salt.as_bytes();
 	let pw = pw.as_bytes();
 
@@ -373,42 +398,16 @@ pub fn md5_encode(pw: &str, salt: &str) -> String {
 		.enumerate()
 		.for_each(|(idx, &x)| digest_final[idx] = x as u32);
 
-	encode_digest(&digest_final)
+	format!("{}{}${}", APR1_ID, salt, encode_digest(&digest_final))
 }
 
-fn encode_digest(digest: &[u32; 16]) -> String {
-	let mut p = vec![0u8; 22];
-	let l = ((digest[0] << 16) | (digest[6] << 8) | digest[12]) as u64;
-	to_64(&mut p[0..4], l, 4);
-
-	let l = ((digest[1] << 16) | (digest[7] << 8) | digest[13]) as u64;
-	to_64(&mut p[4..8], l, 4);
-
-	let l = ((digest[2] << 16) | (digest[8] << 8) | digest[14]) as u64;
-	to_64(&mut p[8..12], l, 4);
-
-	let l = ((digest[3] << 16) | (digest[9] << 8) | digest[15]) as u64;
-	to_64(&mut p[12..16], l, 4);
-
-	let l = ((digest[4] << 16) | (digest[10] << 8) | digest[5]) as u64;
-	to_64(&mut p[16..20], l, 4);
-
-	let l = digest[11] as u64;
-	to_64(&mut p[20..22], l, 2);
-
-	String::from_utf8(p).unwrap()
+// Assumes the hash is in the correct format - $apr1$salt$password
+pub fn verify_apr1_hash(hash: &str, password: &str) -> Result<bool, &'static str> {
+	let salt = &hash[6..14];
+	Ok(&md5_apr1_encode(password, salt) == hash)
 }
 
-fn to_64(s: &mut [u8], mut v: u64, n: i32) {
-	let itoa64 = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".as_bytes();
-
-	for i in 0..n as usize {
-		s[i] = itoa64[(v & 0x3f) as usize];
-		v >>= 6;
-	}
-}
-
-pub fn md5_classic(input: &str) -> [u8; DIGEST_SIZE] {
+pub fn md5_encode(input: &str) -> [u8; DIGEST_SIZE] {
 	let mut buf = [0u8; DIGEST_SIZE];
 	let mut ctx = MD5Ctx::new();
 	ctx.update_buffer(input.as_bytes(), input.as_bytes().len());
