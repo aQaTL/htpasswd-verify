@@ -1,8 +1,8 @@
+use crate::md5::APR1_ID;
 use std::collections::HashMap;
 use std::io;
 use std::path::Path;
 use std::ptr::hash;
-use crate::md5::APR1_ID;
 
 mod md5;
 
@@ -29,7 +29,7 @@ pub fn load(bytes: &str) -> Htpasswd {
 
 fn parse_hash_entry(entry: &str) -> Option<(&str, Hash)> {
 	let semicolon = match entry.find(':') {
-		Some(idx)	=> idx,
+		Some(idx) => idx,
 		None => return None,
 	};
 	let username = &entry[..semicolon];
@@ -44,10 +44,8 @@ fn parse_hash_entry(entry: &str) -> Option<(&str, Hash)> {
 			}),
 		))
 	} else if hash_id.starts_with("$2y$") {
-
 		None
 	} else if hash_id.starts_with("{SHA}") {
-
 		None
 	} else {
 		//Ignore plaintext, assume crypt
@@ -59,13 +57,11 @@ impl Htpasswd<'_> {
 	pub fn check(&self, username: &str, password: &str) -> bool {
 		let hash = &self.0[username];
 		match hash {
-			Hash::MD5(hash) =>
-				md5::md5_apr1_encode(password, hash.salt).as_str() == hash.hash,
+			Hash::MD5(hash) => md5::md5_apr1_encode(password, hash.salt).as_str() == hash.hash,
 			_ => unimplemented!(),
 		}
 	}
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -73,8 +69,7 @@ mod tests {
 
 	#[test]
 	fn md5_verify_htpasswd() {
-		let data =
-			"user2:$apr1$7/CTEZag$omWmIgXPJYoxB3joyuq4S/
+		let data = "user2:$apr1$7/CTEZag$omWmIgXPJYoxB3joyuq4S/
 user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
 		let htpasswd = load(data);
 		assert_eq!(htpasswd.check("user", "password"), true);
@@ -86,14 +81,19 @@ user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
 	#[test]
 	fn md5_apr1() {
 		assert_eq!(
-			md5::format_hash(md5::md5_apr1_encode("password", "xxxxxxxx").as_str(), "xxxxxxxx"),
+			md5::format_hash(
+				md5::md5_apr1_encode("password", "xxxxxxxx").as_str(),
+				"xxxxxxxx"
+			),
 			"$apr1$xxxxxxxx$dxHfLAsjHkDRmG83UXe8K0".to_string()
 		);
 	}
 
 	#[test]
 	fn apr1() {
-		assert!(md5::verify_apr1_hash("$apr1$xxxxxxxx$dxHfLAsjHkDRmG83UXe8K0", "password").unwrap());
+		assert!(
+			md5::verify_apr1_hash("$apr1$xxxxxxxx$dxHfLAsjHkDRmG83UXe8K0", "password").unwrap()
+		);
 	}
 
 	#[test]

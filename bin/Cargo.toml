@@ -1,0 +1,11 @@
+[package]
+name = "htpasswd-verify-bin"
+version = "0.1.0"
+authors = ["aQaTL <mmsoltys@outlook.com>"]
+edition = "2018"
+license = "Apache-2.0"
+
+[dependencies]
+htpasswd-verify = { path = "../" }
+structopt = "0.3"
+anyhow = "1.0"
