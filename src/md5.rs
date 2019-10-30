@@ -58,7 +58,7 @@
  * ----------------------------------------------------------------------------
  */
 
-const APR1_ID: &'static str = "$apr1$";
+pub(crate) const APR1_ID: &'static str = "$apr1$";
 
 const DIGEST_SIZE: usize = 16;
 
@@ -398,13 +398,17 @@ pub fn md5_apr1_encode(pw: &str, salt: &str) -> String {
 		.enumerate()
 		.for_each(|(idx, &x)| digest_final[idx] = x as u32);
 
-	format!("{}{}${}", APR1_ID, salt, encode_digest(&digest_final))
+	encode_digest(&digest_final)
+}
+
+pub fn format_hash(password: &str, salt: &str) -> String {
+	format!("{}{}${}", APR1_ID, salt, password)
 }
 
 // Assumes the hash is in the correct format - $apr1$salt$password
 pub fn verify_apr1_hash(hash: &str, password: &str) -> Result<bool, &'static str> {
 	let salt = &hash[6..14];
-	Ok(&md5_apr1_encode(password, salt) == hash)
+	Ok(&format_hash(&md5_apr1_encode(password, salt), salt) == hash)
 }
 
 pub fn md5_encode(input: &str) -> [u8; DIGEST_SIZE] {
