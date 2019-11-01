@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["aQaTL <mmsoltys@outlook.com>"]
 edition = "2018"
 license = "Apache-2.0"
+description = "Verify hashes stored in apache's htpasswd file"
+repository = "https://github.com/aQaTL/htpasswd-verify"
+keywords = ["apache", "password", "htpasswd"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
