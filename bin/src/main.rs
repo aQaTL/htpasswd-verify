@@ -1,6 +1,6 @@
+use anyhow::anyhow;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use anyhow::anyhow;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
