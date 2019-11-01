@@ -329,6 +329,8 @@ fn to_64(s: &mut [u8], mut v: u64, n: i32) {
 	}
 }
 
+/// Calculates apache specific md5 hash
+/// Returns just the hashed password, use [format_hash](fn.format_hash.html) to get the hash in htpasswd format
 pub fn md5_apr1_encode(pw: &str, salt: &str) -> String {
 	let mut sp = salt.as_bytes();
 	let pw = pw.as_bytes();
@@ -405,7 +407,7 @@ pub fn format_hash(password: &str, salt: &str) -> String {
 	format!("{}{}${}", APR1_ID, salt, password)
 }
 
-// Assumes the hash is in the correct format - $apr1$salt$password
+/// Assumes the hash is in the correct format - $apr1$salt$password
 pub fn verify_apr1_hash(hash: &str, password: &str) -> Result<bool, &'static str> {
 	let salt = &hash[6..14];
 	Ok(&format_hash(&md5_apr1_encode(password, salt), salt) == hash)
