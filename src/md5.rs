@@ -410,11 +410,3 @@ pub fn verify_apr1_hash(hash: &str, password: &str) -> Result<bool, &'static str
 	let salt = &hash[6..14];
 	Ok(&format_hash(&md5_apr1_encode(password, salt), salt) == hash)
 }
-
-pub fn md5_encode(input: &str) -> [u8; DIGEST_SIZE] {
-	let mut buf = [0u8; DIGEST_SIZE];
-	let mut ctx = MD5Ctx::new();
-	ctx.update_buffer(input.as_bytes(), input.as_bytes().len());
-	ctx.md5_final(&mut buf);
-	buf
-}

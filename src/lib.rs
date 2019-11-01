@@ -6,7 +6,7 @@ use std::io;
 use std::path::Path;
 use std::ptr::hash;
 
-mod md5;
+pub mod md5;
 
 static BCRYPT_ID: &'static str = "$2y$";
 static SHA1_ID: &'static str = "{SHA}";
@@ -18,6 +18,7 @@ pub enum Hash<'a> {
 	MD5(MD5Hash<'a>),
 	BCrypt(&'a str),
 	SHA1(&'a str),
+	Crypt(&'a str),
 }
 
 #[derive(Debug)]
@@ -40,7 +41,7 @@ impl Htpasswd<'_> {
 				hasher.result(&mut buf);
 				base64::encode(&buf).as_str() == *hash
 			}
-			_ => unimplemented!(),
+			Hash::Crypt(hash) => pwhash::unix_crypt::verify(password, hash),
 		}
 	}
 }
@@ -78,7 +79,8 @@ fn parse_hash_entry(entry: &str) -> Option<(&str, Hash)> {
 		))
 	} else {
 		//Ignore plaintext, assume crypt
-		None
+
+		Some((username, Hash::Crypt(&entry[(semicolon + 1)..])))
 	}
 }
 
@@ -89,7 +91,14 @@ mod tests {
 	static DATA: &'static str = "user2:$apr1$7/CTEZag$omWmIgXPJYoxB3joyuq4S/
 user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00
 bcrypt_test:$2y$05$nC6nErr9XZJuMJ57WyCob.EuZEjylDt2KaHfbfOtyb.EgL1I2jCVa
-sha1_test:{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=";
+sha1_test:{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=
+crypt_test:bGVh02xkuGli2";
+
+	#[test]
+	fn unix_crypt_verify_htpasswd() {
+		let htpasswd = load(DATA);
+		assert_eq!(htpasswd.check("crypt_test", "password"), true);
+	}
 
 	#[test]
 	fn sha1_verify_htpasswd() {
@@ -127,24 +136,6 @@ sha1_test:{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=";
 	fn apr1() {
 		assert!(
 			md5::verify_apr1_hash("$apr1$xxxxxxxx$dxHfLAsjHkDRmG83UXe8K0", "password").unwrap()
-		);
-	}
-
-	#[test]
-	fn md5_classic() {
-		let buf = md5::md5_encode("password");
-		assert_eq!(
-			buf,
-			[95, 77, 204, 59, 90, 167, 101, 214, 29, 131, 39, 222, 184, 130, 207, 153]
-		);
-	}
-
-	#[test]
-	fn md5_classic_2() {
-		let buf = md5::md5_encode("2[p1o340[123v'pasdaf2-34");
-		assert_eq!(
-			buf,
-			[78, 114, 155, 6, 82, 67, 172, 173, 221, 8, 1, 74, 2, 167, 57, 0]
 		);
 	}
 }
