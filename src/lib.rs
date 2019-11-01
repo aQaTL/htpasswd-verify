@@ -25,12 +25,8 @@
 //! ```
 
 use crate::md5::APR1_ID;
-use crate::Hash::SHA1;
 use crypto::{digest::Digest, sha1::Sha1};
 use std::collections::HashMap;
-use std::io;
-use std::path::Path;
-use std::ptr::hash;
 
 pub mod md5;
 

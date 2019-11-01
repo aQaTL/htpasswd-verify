@@ -286,6 +286,7 @@ fn encode(output: &mut [u8], input: &[u32], len: usize) {
 	}
 }
 
+#[allow(dead_code)]
 fn decode(output: &mut [u32], input: &[u8], len: usize) {
 	let mut i = 0;
 	for j in (0..len).step_by(4) {
