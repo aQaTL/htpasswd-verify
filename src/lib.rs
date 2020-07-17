@@ -43,6 +43,40 @@ pub enum Hash<'a> {
 	Crypt(&'a str),
 }
 
+impl<'a> Hash<'a> {
+    pub fn check(&self, password: &str) -> bool {
+	match self {
+	    Hash::MD5(hash) => md5::md5_apr1_encode(password, hash.salt).as_str() == hash.hash,
+	    Hash::BCrypt(hash) => bcrypt::verify(password, hash).unwrap(),
+	    Hash::SHA1(hash) => {
+		let mut hasher = Sha1::new();
+		hasher.input_str(password);
+		let size = hasher.output_bytes();
+		let mut buf = vec![0u8; size];
+		hasher.result(&mut buf);
+		base64::encode(&buf).as_str() == *hash
+	    }
+	    Hash::Crypt(hash) => pwhash::unix_crypt::verify(password, hash),
+	}
+    }
+
+    pub fn parse(entry: &'a str) -> Self {
+	if entry.starts_with(md5::APR1_ID) {
+	    Hash::MD5(MD5Hash {
+		salt: &entry[(APR1_ID.len())..(APR1_ID.len() + 8)],
+		hash: &entry[(APR1_ID.len() + 8 + 1)..],
+	    })
+	} else if entry.starts_with(BCRYPT_ID) {
+	    Hash::BCrypt(&entry)
+	} else if entry.starts_with("{SHA}") {
+	    Hash::SHA1(&entry[SHA1_ID.len()..])
+	} else {
+	    //Ignore plaintext, assume crypt
+	    Hash::Crypt(&entry)
+	}
+    }
+}
+
 #[derive(Debug)]
 pub struct MD5Hash<'a> {
 	pub salt: &'a str,
@@ -52,19 +86,7 @@ pub struct MD5Hash<'a> {
 impl Htpasswd<'_> {
 	pub fn check(&self, username: &str, password: &str) -> bool {
 		let hash = &self.0[username];
-		match hash {
-			Hash::MD5(hash) => md5::md5_apr1_encode(password, hash.salt).as_str() == hash.hash,
-			Hash::BCrypt(hash) => bcrypt::verify(password, hash).unwrap(),
-			Hash::SHA1(hash) => {
-				let mut hasher = Sha1::new();
-				hasher.input_str(password);
-				let size = hasher.output_bytes();
-				let mut buf = vec![0u8; size];
-				hasher.result(&mut buf);
-				base64::encode(&buf).as_str() == *hash
-			}
-			Hash::Crypt(hash) => pwhash::unix_crypt::verify(password, hash),
-		}
+	        hash.check(password)
 	}
 }
 
@@ -84,26 +106,7 @@ fn parse_hash_entry(entry: &str) -> Option<(&str, Hash)> {
 	let username = &entry[..semicolon];
 
 	let hash_id = &entry[(semicolon + 1)..];
-	if hash_id.starts_with(md5::APR1_ID) {
-		Some((
-			username,
-			Hash::MD5(MD5Hash {
-				salt: &entry[(semicolon + 1 + APR1_ID.len())..(semicolon + 1 + APR1_ID.len() + 8)],
-				hash: &entry[(semicolon + 1 + APR1_ID.len() + 8 + 1)..],
-			}),
-		))
-	} else if hash_id.starts_with(BCRYPT_ID) {
-		Some((username, Hash::BCrypt(&entry[(semicolon + 1)..])))
-	} else if hash_id.starts_with("{SHA}") {
-		Some((
-			username,
-			Hash::SHA1(&entry[(semicolon + 1 + SHA1_ID.len())..]),
-		))
-	} else {
-		//Ignore plaintext, assume crypt
-
-		Some((username, Hash::Crypt(&entry[(semicolon + 1)..])))
-	}
+	Some((username,Hash::parse(hash_id)))
 }
 
 #[cfg(test)]
