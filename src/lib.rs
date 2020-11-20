@@ -163,4 +163,10 @@ crypt_test:bGVh02xkuGli2";
 			md5::verify_apr1_hash("$apr1$xxxxxxxx$dxHfLAsjHkDRmG83UXe8K0", "password").unwrap()
 		);
 	}
+
+	#[test]
+	fn user_not_found() {
+		let htpasswd = load(DATA);
+		assert_eq!(htpasswd.check("user_does_not_exist", "password"), false);
+	}
 }
