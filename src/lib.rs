@@ -7,8 +7,8 @@
 //! Verify MD5 hash
 //!
 //! ```
-//!	let data = "user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
-//! let htpasswd = htpasswd_verify::load(data);
+//! let data = "user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
+//! let htpasswd = htpasswd_verify::Htpasswd::new(data);
 //! assert!(htpasswd.check("user", "password"));
 //! ```
 //!
@@ -30,31 +30,41 @@ use std::collections::HashMap;
 
 pub mod md5;
 
-static BCRYPT_ID: &'static str = "$2y$";
-static SHA1_ID: &'static str = "{SHA}";
+static BCRYPT_ID: &str = "$2y$";
+static SHA1_ID: &str = "{SHA}";
 
-pub struct Htpasswd<'a>(pub HashMap<&'a str, Hash<'a>>);
+pub struct Htpasswd(HashMap<String, Hash>);
 
 #[derive(Debug)]
-pub enum Hash<'a> {
-	MD5(MD5Hash<'a>),
-	BCrypt(&'a str),
-	SHA1(&'a str),
-	Crypt(&'a str),
+pub enum Hash {
+	MD5(MD5Hash),
+	BCrypt(String),
+	SHA1(String),
+	Crypt(String),
 }
 
 #[derive(Debug)]
-pub struct MD5Hash<'a> {
-	pub salt: &'a str,
-	pub hash: &'a str,
+pub struct MD5Hash {
+	pub salt: String,
+	pub hash: String,
 }
 
-impl Htpasswd<'_> {
-	pub fn check(&self, username: &str, password: &str) -> bool {
+impl Htpasswd {
+	pub fn new(bytes: impl AsRef<str>) -> Htpasswd {
+		let lines = bytes.as_ref().split('\n');
+		let hashes = lines
+			.filter_map(parse_hash_entry)
+			.collect::<HashMap<String, Hash>>();
+		Htpasswd(hashes)
+	}
+
+	pub fn check<N: AsRef<str>>(&self, username: N, password: N) -> bool {
+		let username = username.as_ref();
+		let password = password.as_ref();
 		let hash = &self.0.get(username);
 		match hash {
 			Some(Hash::MD5(hash)) => {
-				md5::md5_apr1_encode(password, hash.salt).as_str() == hash.hash
+				md5::md5_apr1_encode(password, &hash.salt).as_str() == hash.hash
 			}
 			Some(Hash::BCrypt(hash)) => bcrypt::verify(password, hash).unwrap(),
 			Some(Hash::SHA1(hash)) => {
@@ -71,49 +81,37 @@ impl Htpasswd<'_> {
 	}
 }
 
-pub fn load(bytes: &str) -> Htpasswd {
-	let lines = bytes.split('\n');
-	let hashes = lines
-		.filter_map(parse_hash_entry)
-		.collect::<HashMap<&str, Hash>>();
-	Htpasswd(hashes)
-}
-
-fn parse_hash_entry(entry: &str) -> Option<(&str, Hash)> {
-	let semicolon = match entry.find(':') {
+fn parse_hash_entry(entry: &str) -> Option<(String, Hash)> {
+	let separator = match entry.find(':') {
 		Some(idx) => idx,
 		None => return None,
 	};
-	let username = &entry[..semicolon];
+	let username = &entry[..separator];
 
-	let hash_id = &entry[(semicolon + 1)..];
+	let hash_id = &entry[(separator + 1)..];
+	let hash;
 	if hash_id.starts_with(md5::APR1_ID) {
-		Some((
-			username,
-			Hash::MD5(MD5Hash {
-				salt: &entry[(semicolon + 1 + APR1_ID.len())..(semicolon + 1 + APR1_ID.len() + 8)],
-				hash: &entry[(semicolon + 1 + APR1_ID.len() + 8 + 1)..],
-			}),
-		))
+		hash = Hash::MD5(MD5Hash {
+			salt: (&entry[(separator + 1 + APR1_ID.len())..(separator + 1 + APR1_ID.len() + 8)])
+				.to_string(),
+			hash: (&entry[(separator + 1 + APR1_ID.len() + 8 + 1)..]).to_string(),
+		});
 	} else if hash_id.starts_with(BCRYPT_ID) {
-		Some((username, Hash::BCrypt(&entry[(semicolon + 1)..])))
-	} else if hash_id.starts_with("{SHA}") {
-		Some((
-			username,
-			Hash::SHA1(&entry[(semicolon + 1 + SHA1_ID.len())..]),
-		))
+		hash = Hash::BCrypt((&entry[(separator + 1)..]).into());
+	} else if hash_id.starts_with(SHA1_ID) {
+		hash = Hash::SHA1((&entry[(separator + 1 + SHA1_ID.len())..]).into());
 	} else {
 		//Ignore plaintext, assume crypt
-
-		Some((username, Hash::Crypt(&entry[(semicolon + 1)..])))
+		hash = Hash::Crypt((&entry[(separator + 1)..]).into());
 	}
+	Some((username.into(), hash))
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
 
-	static DATA: &'static str = "user2:$apr1$7/CTEZag$omWmIgXPJYoxB3joyuq4S/
+	static DATA: &str = "user2:$apr1$7/CTEZag$omWmIgXPJYoxB3joyuq4S/
 user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00
 bcrypt_test:$2y$05$nC6nErr9XZJuMJ57WyCob.EuZEjylDt2KaHfbfOtyb.EgL1I2jCVa
 sha1_test:{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=
@@ -121,25 +119,25 @@ crypt_test:bGVh02xkuGli2";
 
 	#[test]
 	fn unix_crypt_verify_htpasswd() {
-		let htpasswd = load(DATA);
+		let htpasswd = Htpasswd::new(DATA);
 		assert_eq!(htpasswd.check("crypt_test", "password"), true);
 	}
 
 	#[test]
 	fn sha1_verify_htpasswd() {
-		let htpasswd = load(DATA);
+		let htpasswd = Htpasswd::new(DATA);
 		assert_eq!(htpasswd.check("sha1_test", "password"), true);
 	}
 
 	#[test]
 	fn bcrypt_verify_htpasswd() {
-		let htpasswd = load(DATA);
+		let htpasswd = Htpasswd::new(DATA);
 		assert_eq!(htpasswd.check("bcrypt_test", "password"), true);
 	}
 
 	#[test]
 	fn md5_verify_htpasswd() {
-		let htpasswd = load(DATA);
+		let htpasswd = Htpasswd::new(DATA);
 		assert_eq!(htpasswd.check("user", "password"), true);
 		assert_eq!(htpasswd.check("user", "passwort"), false);
 		assert_eq!(htpasswd.check("user2", "zaq1@WSX"), true);
@@ -166,7 +164,7 @@ crypt_test:bGVh02xkuGli2";
 
 	#[test]
 	fn user_not_found() {
-		let htpasswd = load(DATA);
+		let htpasswd = Htpasswd::new(DATA);
 		assert_eq!(htpasswd.check("user_does_not_exist", "password"), false);
 	}
 }
