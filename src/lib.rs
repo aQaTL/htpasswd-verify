@@ -7,7 +7,7 @@
 //! Verify MD5 hash
 //!
 //! ```
-//!	let data = "user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
+//! let data = "user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
 //! let htpasswd = htpasswd_verify::load(data);
 //! assert!(htpasswd.check("user", "password"));
 //! ```
@@ -30,8 +30,8 @@ use std::collections::HashMap;
 
 pub mod md5;
 
-static BCRYPT_ID: &'static str = "$2y$";
-static SHA1_ID: &'static str = "{SHA}";
+static BCRYPT_ID: &str = "$2y$";
+static SHA1_ID: &str = "{SHA}";
 
 pub struct Htpasswd<'a>(pub HashMap<&'a str, Hash<'a>>);
 
