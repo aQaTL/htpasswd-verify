@@ -66,6 +66,22 @@ impl<'a> Hash<'a> {
 		}
 	}
 
+	/// Parses the hash part of the htpasswd entry.
+	///
+	/// Example:
+	///
+	/// ```
+	/// use htpasswd_verify::{Hash, MD5Hash};
+	///
+	/// let entry = "user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
+	/// let semicolon = entry.find(':').unwrap();
+	/// let username = &entry[..semicolon];
+	///
+	/// let hash_id = &entry[(semicolon + 1)..];
+	/// assert_eq!(hash_id, "$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00");
+	/// let hash = Hash::parse(hash_id);
+	/// assert!(matches!(hash, Hash::MD5(MD5Hash { salt: "lZL6V/ci", hash: "eIMz/iKDkbtys/uU7LEK00"})));
+	/// ```
 	pub fn parse(hash: &'a str) -> Self {
 		if hash.starts_with(md5::APR1_ID) {
 			Hash::MD5(MD5Hash {
