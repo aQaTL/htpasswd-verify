@@ -51,11 +51,13 @@ pub struct MD5Hash<'a> {
 
 impl Htpasswd<'_> {
 	pub fn check(&self, username: &str, password: &str) -> bool {
-		let hash = &self.0[username];
+		let hash = &self.0.get(username);
 		match hash {
-			Hash::MD5(hash) => md5::md5_apr1_encode(password, hash.salt).as_str() == hash.hash,
-			Hash::BCrypt(hash) => bcrypt::verify(password, hash).unwrap(),
-			Hash::SHA1(hash) => {
+			Some(Hash::MD5(hash)) => {
+				md5::md5_apr1_encode(password, hash.salt).as_str() == hash.hash
+			}
+			Some(Hash::BCrypt(hash)) => bcrypt::verify(password, hash).unwrap(),
+			Some(Hash::SHA1(hash)) => {
 				let mut hasher = Sha1::new();
 				hasher.input_str(password);
 				let size = hasher.output_bytes();
@@ -63,7 +65,8 @@ impl Htpasswd<'_> {
 				hasher.result(&mut buf);
 				base64::encode(&buf).as_str() == *hash
 			}
-			Hash::Crypt(hash) => pwhash::unix_crypt::verify(password, hash),
+			Some(Hash::Crypt(hash)) => pwhash::unix_crypt::verify(password, hash),
+			None => false,
 		}
 	}
 }
@@ -159,5 +162,11 @@ crypt_test:bGVh02xkuGli2";
 		assert!(
 			md5::verify_apr1_hash("$apr1$xxxxxxxx$dxHfLAsjHkDRmG83UXe8K0", "password").unwrap()
 		);
+	}
+
+	#[test]
+	fn user_not_found() {
+		let htpasswd = load(DATA);
+		assert_eq!(htpasswd.check("user_does_not_exist", "password"), false);
 	}
 }
