@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
 	let opt = Opt::from_args();
 
 	let data = std::fs::read_to_string(opt.file_name)?;
-	let htpasswd = htpasswd_verify::load(&data);
+	let htpasswd = htpasswd_verify::Htpasswd::new(&data);
 	let check_res = htpasswd.check(&opt.username, &opt.password);
 	if check_res {
 		println!("Password correct");

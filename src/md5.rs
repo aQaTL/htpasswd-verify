@@ -142,7 +142,7 @@ impl MD5Ctx {
 
 	fn update_buffer(&mut self, input: &[u8], input_len: usize) {
 		let mut i;
-		let mut idx = ((self.count[0] >> 3) & 0x3F) as u32;
+		let mut idx: u32 = (self.count[0] >> 3) & 0x3F;
 
 		self.count[0] += (input_len << 3) as u32;
 		if self.count[0] < ((input_len << 3) as u32) {
@@ -299,31 +299,31 @@ fn decode(output: &mut [u32], input: &[u8], len: usize) {
 fn encode_digest(digest: &[u32; 16]) -> String {
 	let mut p = vec![0u8; 22];
 	let l = ((digest[0] << 16) | (digest[6] << 8) | digest[12]) as u64;
-	to_64(&mut p[0..4], l, 4);
+	to_64(&mut p[0..4], l);
 
 	let l = ((digest[1] << 16) | (digest[7] << 8) | digest[13]) as u64;
-	to_64(&mut p[4..8], l, 4);
+	to_64(&mut p[4..8], l);
 
 	let l = ((digest[2] << 16) | (digest[8] << 8) | digest[14]) as u64;
-	to_64(&mut p[8..12], l, 4);
+	to_64(&mut p[8..12], l);
 
 	let l = ((digest[3] << 16) | (digest[9] << 8) | digest[15]) as u64;
-	to_64(&mut p[12..16], l, 4);
+	to_64(&mut p[12..16], l);
 
 	let l = ((digest[4] << 16) | (digest[10] << 8) | digest[5]) as u64;
-	to_64(&mut p[16..20], l, 4);
+	to_64(&mut p[16..20], l);
 
 	let l = digest[11] as u64;
-	to_64(&mut p[20..22], l, 2);
+	to_64(&mut p[20..22], l);
 
 	String::from_utf8(p).unwrap()
 }
 
-fn to_64(s: &mut [u8], mut v: u64, n: i32) {
+fn to_64(s: &mut [u8], mut v: u64) {
 	let itoa64 = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".as_bytes();
 
-	for el in s.iter_mut().take(n as usize) {
-		*el = itoa64[(v & 0x3f) as usize];
+	for b in s.iter_mut() {
+		*b = itoa64[(v & 0x3f) as usize];
 		v >>= 6;
 	}
 }
