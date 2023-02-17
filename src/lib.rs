@@ -8,7 +8,22 @@
 //!
 //! ```
 //! let data = "user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
-//! let htpasswd = htpasswd_verify::Htpasswd::new(data);
+//! let htpasswd = htpasswd_verify::Htpasswd::from(data);
+//! assert!(htpasswd.check("user", "password"));
+//! ```
+//!
+//! Create [Htpasswd] without borrowing the data
+//!
+//! ```
+//! use htpasswd_verify::Htpasswd;
+//!
+//! let htpasswd: Htpasswd<'static> = {
+//!     let data = "\nuser:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00\n";
+//!     // Trim the data to show that we're not using a 'static str
+//!     let data = data.trim();
+//!     Htpasswd::new_owned(data)
+//! };
+//!
 //! assert!(htpasswd.check("user", "password"));
 //! ```
 //!
@@ -24,37 +39,51 @@
 //! assert_eq!(hash, "$apr1$RandSalt$PgCXHRrkpSt4cbyC2C6bm/");
 //! ```
 
-use crate::md5::APR1_ID;
-use crypto::{digest::Digest, sha1::Sha1};
+use std::borrow::Cow;
 use std::collections::HashMap;
+
+use crypto::{digest::Digest, sha1::Sha1};
+
+use crate::md5::APR1_ID;
 
 pub mod md5;
 
 static BCRYPT_ID: &str = "$2y$";
 static SHA1_ID: &str = "{SHA}";
 
-pub struct Htpasswd(HashMap<String, Hash>);
+pub struct Htpasswd<'a>(HashMap<Cow<'a, str>, Hash<'a>>);
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum Hash {
-	MD5(MD5Hash),
-	BCrypt(String),
-	SHA1(String),
-	Crypt(String),
+pub enum Hash<'a> {
+	MD5(MD5Hash<'a>),
+	BCrypt(Cow<'a, str>),
+	SHA1(Cow<'a, str>),
+	Crypt(Cow<'a, str>),
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct MD5Hash {
-	pub salt: String,
-	pub hash: String,
+pub struct MD5Hash<'a> {
+	pub salt: Cow<'a, str>,
+	pub hash: Cow<'a, str>,
 }
 
-impl Htpasswd {
-	pub fn new(bytes: impl AsRef<str>) -> Htpasswd {
-		let lines = bytes.as_ref().split('\n');
+impl Htpasswd<'static> {
+	pub fn new_owned(bytes: &str) -> Htpasswd<'static> {
+		let lines = bytes.split('\n');
 		let hashes = lines
 			.filter_map(parse_hash_entry)
-			.collect::<HashMap<String, Hash>>();
+			.map(|(username, hash)| (Cow::Owned(username.to_string()), hash.to_owned()))
+			.collect::<HashMap<_, _>>();
+		Htpasswd(hashes)
+	}
+}
+
+impl<'a> Htpasswd<'a> {
+	pub fn new_borrowed(bytes: &'a str) -> Htpasswd<'a> {
+		let lines = bytes.split('\n');
+		let hashes = lines
+			.filter_map(parse_hash_entry)
+			.collect::<HashMap<_, _>>();
 		Htpasswd(hashes)
 	}
 
@@ -64,9 +93,31 @@ impl Htpasswd {
 			.map(|hash| hash.check(password))
 			.unwrap_or_default()
 	}
+
+	pub fn into_owned(self) -> Htpasswd<'static> {
+		Htpasswd(
+			self.0
+				.into_iter()
+				.map(|(username, hash)| (Cow::Owned(username.to_string()), hash.to_owned()))
+				.collect(),
+		)
+	}
 }
 
-impl Hash {
+fn parse_hash_entry(entry: &str) -> Option<(Cow<str>, Hash)> {
+	let separator = entry.find(':')?;
+	let username = &entry[..separator];
+	let hash_id = &entry[(separator + 1)..];
+	Some((Cow::Borrowed(username), Hash::parse(hash_id)))
+}
+
+impl<'a> From<&'a str> for Htpasswd<'a> {
+	fn from(s: &'a str) -> Self {
+		Htpasswd::new_borrowed(s)
+	}
+}
+
+impl<'a> Hash<'a> {
 	pub fn check<S: AsRef<str>>(&self, password: S) -> bool {
 		let password = password.as_ref();
 		match self {
@@ -101,33 +152,41 @@ impl Hash {
 	/// assert_eq!(
 	///     hash,
 	///     Hash::MD5(MD5Hash {
-	///         salt: "lZL6V/ci".to_string(),
-	///         hash: "eIMz/iKDkbtys/uU7LEK00".to_string(),
+	///         salt: "lZL6V/ci".into(),
+	///         hash: "eIMz/iKDkbtys/uU7LEK00".into(),
 	///     },
 	/// ));
 	/// ```
-	pub fn parse(hash: &str) -> Self {
+	pub fn parse(hash: &'a str) -> Hash<'a> {
 		if hash.starts_with(APR1_ID) {
 			Hash::MD5(MD5Hash {
-				salt: hash[(APR1_ID.len())..(APR1_ID.len() + 8)].to_string(),
-				hash: hash[(APR1_ID.len() + 8 + 1)..].to_string(),
+				salt: Cow::Borrowed(&hash[(APR1_ID.len())..(APR1_ID.len() + 8)]),
+				hash: Cow::Borrowed(&hash[(APR1_ID.len() + 8 + 1)..]),
 			})
 		} else if hash.starts_with(BCRYPT_ID) {
-			Hash::BCrypt(hash.to_string())
+			Hash::BCrypt(Cow::Borrowed(hash))
 		} else if hash.starts_with("{SHA}") {
-			Hash::SHA1(hash[SHA1_ID.len()..].to_string())
+			Hash::SHA1(Cow::Borrowed(&hash[SHA1_ID.len()..]))
 		} else {
 			//Ignore plaintext, assume crypt
-			Hash::Crypt(hash.to_string())
+			Hash::Crypt(Cow::Borrowed(hash))
 		}
 	}
-}
 
-fn parse_hash_entry(entry: &str) -> Option<(String, Hash)> {
-	let separator = entry.find(':')?;
-	let username = &entry[..separator];
-	let hash_id = &entry[(separator + 1)..];
-	Some((username.to_string(), Hash::parse(hash_id)))
+	fn to_owned(&'a self) -> Hash<'static> {
+		match self {
+			Hash::MD5(MD5Hash { salt, hash }) => Hash::MD5(MD5Hash {
+				salt: Cow::Owned(salt.to_string()),
+				hash: Cow::Owned(hash.to_string()),
+			}),
+			Hash::BCrypt(hash) => Hash::BCrypt(Cow::Owned(hash.to_string())),
+			Hash::SHA1(hash) => Hash::SHA1(Cow::Owned(hash.to_string())),
+			Hash::Crypt(hash) => {
+				let hash = hash.to_string();
+				Hash::Crypt(Cow::Owned(hash))
+			}
+		}
+	}
 }
 
 #[cfg(test)]
@@ -142,25 +201,25 @@ crypt_test:bGVh02xkuGli2";
 
 	#[test]
 	fn unix_crypt_verify_htpasswd() {
-		let htpasswd = Htpasswd::new(DATA);
+		let htpasswd = Htpasswd::from(DATA);
 		assert_eq!(htpasswd.check("crypt_test", "password"), true);
 	}
 
 	#[test]
 	fn sha1_verify_htpasswd() {
-		let htpasswd = Htpasswd::new(DATA);
+		let htpasswd = Htpasswd::from(DATA);
 		assert_eq!(htpasswd.check("sha1_test", "password"), true);
 	}
 
 	#[test]
 	fn bcrypt_verify_htpasswd() {
-		let htpasswd = Htpasswd::new(DATA);
+		let htpasswd = Htpasswd::from(DATA);
 		assert_eq!(htpasswd.check("bcrypt_test", "password"), true);
 	}
 
 	#[test]
 	fn md5_verify_htpasswd() {
-		let htpasswd = Htpasswd::new(DATA);
+		let htpasswd = Htpasswd::from(DATA);
 		assert_eq!(htpasswd.check("user", "password"), true);
 		assert_eq!(htpasswd.check("user", "passwort"), false);
 		assert_eq!(htpasswd.check("user2", "zaq1@WSX"), true);
@@ -187,7 +246,7 @@ crypt_test:bGVh02xkuGli2";
 
 	#[test]
 	fn user_not_found() {
-		let htpasswd = Htpasswd::new(DATA);
+		let htpasswd = Htpasswd::new_borrowed(DATA);
 		assert_eq!(htpasswd.check("user_does_not_exist", "password"), false);
 	}
 }

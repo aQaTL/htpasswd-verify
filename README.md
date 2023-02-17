@@ -10,7 +10,7 @@ Verify MD5 hash
 
 ```
 let data = "user:$apr1$lZL6V/ci$eIMz/iKDkbtys/uU7LEK00";
-let htpasswd = htpasswd_verify::load(data);
+let htpasswd = htpasswd_verify::Htpasswd::from(data);
 assert!(htpasswd.check("user", "password"));
 ```
 
