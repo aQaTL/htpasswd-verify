@@ -95,6 +95,11 @@ impl<'a> Htpasswd<'a> {
 			.unwrap_or_default()
 	}
 
+	/// Returns true if the specified username is loaded into this [Htpasswd] instance, false otherwise
+	pub fn has_username<S: AsRef<str>>(&self, username: S) -> bool {
+		self.0.contains_key(username.as_ref())
+	}
+
 	pub fn into_owned(self) -> Htpasswd<'static> {
 		Htpasswd(
 			self.0
