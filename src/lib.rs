@@ -43,7 +43,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use base64::prelude::*;
-use crypto::{digest::Digest, sha1::Sha1};
+use sha1::{Digest, Sha1};
 
 use crate::md5::APR1_ID;
 
@@ -128,14 +128,7 @@ impl<'a> Hash<'a> {
 		match self {
 			Hash::MD5(hash) => md5::md5_apr1_encode(password, &hash.salt).as_str() == hash.hash,
 			Hash::BCrypt(hash) => bcrypt::verify(password, hash).unwrap(),
-			Hash::SHA1(hash) => {
-				let mut hasher = Sha1::new();
-				hasher.input_str(password);
-				let size = hasher.output_bytes();
-				let mut buf = vec![0u8; size];
-				hasher.result(&mut buf);
-				BASE64_STANDARD.encode(&buf).as_str() == *hash
-			}
+			Hash::SHA1(hash) => BASE64_STANDARD.encode(Sha1::digest(password)).as_str() == *hash,
 			Hash::Crypt(hash) => pwhash::unix_crypt::verify(password, hash),
 		}
 	}
