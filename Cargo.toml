@@ -16,5 +16,6 @@ members = [ "bin" ]
 [dependencies]
 base64 = "0.21"
 bcrypt = "0.15"
+md-5 = "0.10"
 pwhash = "1"
 sha1 = "0.10"
