@@ -2,7 +2,7 @@
 name = "htpasswd-verify"
 version = "0.3.0"
 authors = ["aQaTL <mmsoltys@outlook.com>"]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 description = "Verify hashes stored in apache's htpasswd file"
 repository = "https://github.com/aQaTL/htpasswd-verify"
