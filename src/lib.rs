@@ -42,6 +42,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use base64::prelude::*;
 use crypto::{digest::Digest, sha1::Sha1};
 
 use crate::md5::APR1_ID;
@@ -129,7 +130,7 @@ impl<'a> Hash<'a> {
 				let size = hasher.output_bytes();
 				let mut buf = vec![0u8; size];
 				hasher.result(&mut buf);
-				base64::encode(&buf).as_str() == *hash
+				BASE64_STANDARD.encode(&buf).as_str() == *hash
 			}
 			Hash::Crypt(hash) => pwhash::unix_crypt::verify(password, hash),
 		}
