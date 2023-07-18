@@ -88,11 +88,10 @@ impl<'a> Htpasswd<'a> {
 		Htpasswd(hashes)
 	}
 
-	pub fn check<S: AsRef<str>>(&self, username: S, password: S) -> bool {
+	pub fn check<U: AsRef<str>, P: AsRef<str>>(&self, username: U, password: P) -> bool {
 		self.0
 			.get(username.as_ref())
-			.map(|hash| hash.check(password))
-			.unwrap_or_default()
+			.map_or(false, |hash| hash.check(password))
 	}
 
 	/// Returns true if the specified username is loaded into this [Htpasswd] instance, false otherwise
