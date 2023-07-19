@@ -42,7 +42,8 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use crypto::{digest::Digest, sha1::Sha1};
+use base64::prelude::*;
+use sha1::{Digest, Sha1};
 
 use crate::md5::APR1_ID;
 
@@ -87,11 +88,15 @@ impl<'a> Htpasswd<'a> {
 		Htpasswd(hashes)
 	}
 
-	pub fn check<S: AsRef<str>>(&self, username: S, password: S) -> bool {
+	pub fn check<U: AsRef<str>, P: AsRef<str>>(&self, username: U, password: P) -> bool {
 		self.0
 			.get(username.as_ref())
-			.map(|hash| hash.check(password))
-			.unwrap_or_default()
+			.map_or(false, |hash| hash.check(password))
+	}
+
+	/// Returns true if the specified username is loaded into this [Htpasswd] instance, false otherwise
+	pub fn has_username<S: AsRef<str>>(&self, username: S) -> bool {
+		self.0.contains_key(username.as_ref())
 	}
 
 	pub fn into_owned(self) -> Htpasswd<'static> {
@@ -123,14 +128,7 @@ impl<'a> Hash<'a> {
 		match self {
 			Hash::MD5(hash) => md5::md5_apr1_encode(password, &hash.salt).as_str() == hash.hash,
 			Hash::BCrypt(hash) => bcrypt::verify(password, hash).unwrap(),
-			Hash::SHA1(hash) => {
-				let mut hasher = Sha1::new();
-				hasher.input_str(password);
-				let size = hasher.output_bytes();
-				let mut buf = vec![0u8; size];
-				hasher.result(&mut buf);
-				base64::encode(&buf).as_str() == *hash
-			}
+			Hash::SHA1(hash) => BASE64_STANDARD.encode(Sha1::digest(password)).as_str() == *hash,
 			Hash::Crypt(hash) => pwhash::unix_crypt::verify(password, hash),
 		}
 	}
